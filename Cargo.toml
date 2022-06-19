@@ -14,3 +14,5 @@ axum = { version="0.5", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }
 wasmedge-sys = "0.7"
 wasmedge-bindgen-host = "0.2"
+toml = "0.5"
+clap = { version = "3.2.5", features = ["derive"] }
