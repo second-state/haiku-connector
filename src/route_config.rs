@@ -7,6 +7,8 @@ pub enum Method {
 	Get,
 	#[serde(rename = "POST")]
 	Post,
+	#[serde(rename = "PUT")]
+	PUT,
 	#[serde(rename = "DELETE")]
 	Delete
 }
