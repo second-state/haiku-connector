@@ -47,17 +47,20 @@ async fn handler(
 			if method.eq(serde_json::to_string(&c.method).unwrap().as_str()) {
 				match INIT.wasm.execute(c.func_name.as_str(), headers, queries, body) {
 					Ok((ret_status, ret_headers, ret_body)) => {
-						let ret_headers: HashMap<String, String> = match serde_json::from_str(ret_headers.as_str()) {
-							Ok(h) => h,
-							Err(e) => {
-								return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Invalid response headers. {:?}", e).as_bytes().to_vec()));
-							}
-						};
 						let mut ret_header_map = HeaderMap::new();
-						for (k, v) in ret_headers.iter() {
-							if let Ok(header_name) = HeaderName::from_bytes(k.as_bytes()) {
-								if let Ok(header_value) = HeaderValue::from_str(v) {
-									ret_header_map.insert(header_name, header_value);
+
+						if ret_headers.len() > 0 {
+							let ret_headers: HashMap<String, String> = match serde_json::from_str(ret_headers.as_str()) {
+								Ok(h) => h,
+								Err(e) => {
+									return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Invalid response headers. {:?}", e).as_bytes().to_vec()));
+								}
+							};
+							for (k, v) in ret_headers.iter() {
+								if let Ok(header_name) = HeaderName::from_bytes(k.as_bytes()) {
+									if let Ok(header_value) = HeaderValue::from_str(v) {
+										ret_header_map.insert(header_name, header_value);
+									}
 								}
 							}
 						}

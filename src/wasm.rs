@@ -132,7 +132,7 @@ impl Wasm {
 					let mut header_map = HeaderMap::new();
 					for (k, v) in headers.into_iter() {
 						if let Ok(hn) = HeaderName::from_str(k.as_str()) {
-							if let Ok(hv) = HeaderValue::from_str(v.to_string().as_str()) {
+							if let Ok(hv) = HeaderValue::from_str(v.as_str().unwrap_or_default()) {
 								header_map.insert(hn, hv);
 							}
 						}
