@@ -60,7 +60,7 @@ fn settle_resp(
 	));
 }
 
-fn handler(func_name: String) -> impl Handler<(HeaderMap, Query<HashMap<String, String>>, Bytes)> {
+fn handler(func_name: String, async_func_name: Option<String>) -> impl Handler<(HeaderMap, Query<HashMap<String, String>>, Bytes)> {
 	return |headers: HeaderMap,
 	        Query(queries): Query<HashMap<String, String>>,
 	        bytes: Bytes|
@@ -76,10 +76,20 @@ fn handler(func_name: String) -> impl Handler<(HeaderMap, Query<HashMap<String, 
 			let queries = serde_json::to_string(&queries).unwrap();
 			match INIT
 				.wasm
-				.execute(func_name.as_str(), headers, queries, body)
+				.execute(func_name.as_str(), headers.as_str(), queries.as_str(), &body)
 			{
 				Ok((ret_status, ret_headers, ret_body)) => {
-					settle_resp(ret_status, ret_headers, ret_body)
+					if async_func_name.is_some() && ret_status == 100 {
+						tokio::spawn(async move {
+							let _ = INIT
+								.wasm
+								.execute(async_func_name.unwrap().as_str(), headers.as_str(), queries.as_str(), &body);
+						});
+						// return 200 if the async func is called
+						settle_resp(200, ret_headers, ret_body)
+					} else {
+						settle_resp(ret_status, ret_headers, ret_body)
+					}
 				}
 				Err(e) => {
 					return Err((StatusCode::INTERNAL_SERVER_ERROR, e.as_bytes().to_vec()));
@@ -91,6 +101,7 @@ fn handler(func_name: String) -> impl Handler<(HeaderMap, Query<HashMap<String, 
 
 fn multipart_handler(
 	func_name: String,
+	async_func_name: Option<String>,
 ) -> impl Handler<(
 	HeaderMap,
 	Query<HashMap<String, String>>,
@@ -167,10 +178,20 @@ fn multipart_handler(
 
 			match INIT
 				.wasm
-				.execute_fileparts(func_name.as_str(), headers, queries, body, fileparts)
+				.execute_fileparts(func_name.as_str(), headers.as_str(), queries.as_str(), &body, &fileparts)
 			{
 				Ok((ret_status, ret_headers, ret_body)) => {
-					settle_resp(ret_status, ret_headers, ret_body)
+					if async_func_name.is_some() && ret_status == 100 {
+						tokio::spawn(async move {
+							let _ = INIT
+								.wasm
+								.execute_fileparts(async_func_name.unwrap().as_str(), headers.as_str(), queries.as_str(), &body, &fileparts);
+						});
+						// return 200 if the async func is called
+						settle_resp(200, ret_headers, ret_body)
+					} else {
+						settle_resp(ret_status, ret_headers, ret_body)
+					}
 				}
 				Err(e) => {
 					return Err((StatusCode::INTERNAL_SERVER_ERROR, e.as_bytes().to_vec()));
@@ -192,14 +213,14 @@ async fn main() {
 				c.path.as_str(),
 				routing::on(
 					MethodFilter::from_bits(c.method as u16).unwrap(),
-					multipart_handler(c.func_name.to_string()),
+					multipart_handler(c.func_name.to_string(), c.async_func_name.clone()),
 				),
 			),
 			_ => app.route(
 				c.path.as_str(),
 				routing::on(
 					MethodFilter::from_bits(c.method as u16).unwrap(),
-					handler(c.func_name.to_string()),
+					handler(c.func_name.to_string(), c.async_func_name.clone()),
 				),
 			),
 		}

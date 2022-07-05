@@ -293,7 +293,9 @@ impl Wasm {
 				Err(e) => return Err(e),
 			};
 
-			let _ = Wasm::do_request(url, method, headers, body);
+			tokio::spawn(async move {
+				let _ = Wasm::do_request(url, method, headers, body);
+			});
 
 			Ok(vec![])
 		}
@@ -348,7 +350,9 @@ impl Wasm {
 					Err(e) => return Err(e),
 				};
 
-			let _ = Wasm::do_fileparts_request(url, method, headers, body, fileparts);
+			tokio::spawn(async move {
+				let _ = Wasm::do_fileparts_request(url, method, headers, body, fileparts);
+			});
 
 			Ok(vec![])
 		}
@@ -357,9 +361,9 @@ impl Wasm {
 	pub fn execute(
 		&self,
 		func_name: &str,
-		headers: String,
-		queries: String,
-		body: Vec<u8>,
+		headers: &str,
+		queries: &str,
+		body: &Vec<u8>,
 	) -> Result<(u16, String, Vec<u8>), String> {
 		let params = vec![
 			Param::String(headers),
@@ -391,10 +395,10 @@ impl Wasm {
 	pub fn execute_fileparts(
 		&self,
 		func_name: &str,
-		headers: String,
-		queries: String,
-		body: Vec<u8>,
-		fileparts: Vec<u8>,
+		headers: &str,
+		queries: &str,
+		body: &Vec<u8>,
+		fileparts: &Vec<u8>,
 	) -> Result<(u16, String, Vec<u8>), String> {
 		let params = vec![
 			Param::String(headers),

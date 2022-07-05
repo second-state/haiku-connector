@@ -36,6 +36,7 @@ pub enum ContentType {
 #[derive(Debug, Deserialize)]
 pub struct Route {
 	pub func_name: String,
+	pub async_func_name: Option<String>,
 	pub path: String,
 	pub method: Method,
 	pub content_type: Option<ContentType>,
