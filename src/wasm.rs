@@ -1,11 +1,10 @@
 use hyper::HeaderMap;
 use reqwest::{
-	blocking::ClientBuilder,
+	blocking::{multipart, ClientBuilder},
 	header::{HeaderName, HeaderValue},
 	Method,
 };
 use serde_json::value::Value;
-use std::io::BufRead;
 use std::{
 	borrow::BorrowMut,
 	convert::From,
@@ -18,7 +17,7 @@ use wasmedge_bindgen_host::{Bindgen, Param};
 use wasmedge_sys::*;
 use wasmedge_types::ValType;
 
-use wasmhaiku_host::RequestMethod;
+use wasmhaiku_host::{fileparts::FileParts, RequestMethod};
 
 const TIMEOUT: u64 = 120;
 
@@ -81,6 +80,22 @@ impl Wasm {
 			let func = Function::create(&func_ty, boxed_fn, 0)
 				.expect("fail to create a Function instance");
 			imp_obj.add_func("send_async_request", func);
+
+			// Register the host function 'send_fileparts_request'
+			let func_ty = FuncType::create(vec![ValType::I32; 9], vec![ValType::I32; 1])
+				.expect("fail to create a FuncType");
+			let boxed_fn = Box::new(this.clone().send_fileparts_request());
+			let func = Function::create(&func_ty, boxed_fn, 0)
+				.expect("fail to create a Function instance");
+			imp_obj.add_func("send_fileparts_request", func);
+
+			// Register the host function 'send_async_fileparts_request'
+			let func_ty =
+				FuncType::create(vec![ValType::I32; 9], vec![]).expect("fail to create a FuncType");
+			let boxed_fn = Box::new(this.clone().send_async_fileparts_request());
+			let func = Function::create(&func_ty, boxed_fn, 0)
+				.expect("fail to create a Function instance");
+			imp_obj.add_func("send_async_fileparts_request", func);
 
 			vm.register_wasm_from_import(ImportObject::Import(imp_obj))
 				.unwrap();
@@ -175,6 +190,30 @@ impl Wasm {
 		Ok((url, method, headers, body))
 	}
 
+	fn parse_fileparts_params(
+		memory: &Memory,
+		inputs: Vec<WasmValue>,
+	) -> Result<(String, Method, HeaderMap, Vec<u8>, Vec<u8>), u8> {
+		let fileparts = match inputs[7].to_i32() as u32 {
+			0 => vec![],
+			fileparts_pointer => {
+				let fileparts = match memory.get_data(fileparts_pointer, inputs[8].to_i32() as u32)
+				{
+					Ok(d) => d,
+					Err(_) => {
+						return Err(WasmEdgeResultCode::TERMINATE as u8);
+					}
+				};
+				fileparts
+			}
+		};
+
+		match Wasm::parse_params(memory, inputs) {
+			Ok((url, method, headers, body)) => Ok((url, method, headers, body, fileparts)),
+			Err(e) => Err(e),
+		}
+	}
+
 	fn set_wasm_memory(data: Vec<u8>, memory: &mut Memory, vm: &Vm) -> Result<i32, u8> {
 		let len = data.len();
 		match vm.run_function("allocate", vec![WasmValue::from_i32(len as i32)]) {
@@ -184,6 +223,27 @@ impl Wasm {
 			},
 			Err(_) => Err(WasmEdgeResultCode::TERMINATE as u8),
 		}
+	}
+
+	fn settle_result(
+		status: u16,
+		ret_body: Vec<u8>,
+		memory: &mut Memory,
+		vm: &Vm,
+	) -> Result<Vec<WasmValue>, u8> {
+		let body_len: [u8; 4] = (ret_body.len() as i32).to_le_bytes().try_into().unwrap();
+		let body_pointer = match Wasm::set_wasm_memory(ret_body, memory, vm) {
+			Ok(p) => p.to_le_bytes().try_into().unwrap(),
+			Err(e) => return Err(e),
+		};
+
+		let status = (status as i32).to_le_bytes().try_into().unwrap();
+		let whole = [body_pointer, body_len, status].concat();
+		let whole_pointer = match Wasm::set_wasm_memory(whole, memory, vm) {
+			Ok(p) => p,
+			Err(e) => return Err(e),
+		};
+		Ok(vec![WasmValue::from_i32(whole_pointer)])
 	}
 
 	fn send_request(self) -> impl Fn(Vec<WasmValue>) -> Result<Vec<WasmValue>, u8> {
@@ -207,22 +267,7 @@ impl Wasm {
 			match Wasm::do_request(url, method, headers, body) {
 				Ok((status, ret_body)) => {
 					let vm = mbg.vm();
-
-					let body_len: [u8; 4] =
-						(ret_body.len() as i32).to_le_bytes().try_into().unwrap();
-
-					let body_pointer = match Wasm::set_wasm_memory(ret_body, &mut memory, vm) {
-						Ok(p) => p.to_le_bytes().try_into().unwrap(),
-						Err(e) => return Err(e),
-					};
-
-					let status = (status as i32).to_le_bytes().try_into().unwrap();
-					let whole = [body_pointer, body_len, status].concat();
-					let whole_pointer = match Wasm::set_wasm_memory(whole, &mut memory, vm) {
-						Ok(p) => p,
-						Err(e) => return Err(e),
-					};
-					Ok(vec![WasmValue::from_i32(whole_pointer)])
+					Wasm::settle_result(status, ret_body, &mut memory, vm)
 				}
 
 				Err(_) => Err(WasmEdgeResultCode::FAIL as u8),
@@ -249,6 +294,61 @@ impl Wasm {
 			};
 
 			let _ = Wasm::do_request(url, method, headers, body);
+
+			Ok(vec![])
+		}
+	}
+
+	fn send_fileparts_request(self) -> impl Fn(Vec<WasmValue>) -> Result<Vec<WasmValue>, u8> {
+		let _self = self.clone();
+		move |inputs: Vec<WasmValue>| -> Result<Vec<WasmValue>, u8> {
+			let mut bg = _self.bg.lock().unwrap();
+			let mut mbg = bg.borrow_mut().clone();
+			drop(bg);
+			let mut memory = mbg
+				.vm()
+				.active_module()
+				.unwrap()
+				.get_memory("memory")
+				.unwrap();
+
+			let (url, method, headers, body, fileparts) =
+				match Wasm::parse_fileparts_params(&memory, inputs) {
+					Ok(p) => p,
+					Err(e) => return Err(e),
+				};
+
+			match Wasm::do_fileparts_request(url, method, headers, body, fileparts) {
+				Ok((status, ret_body)) => {
+					let vm = mbg.vm();
+					Wasm::settle_result(status, ret_body, &mut memory, vm)
+				}
+
+				Err(_) => Err(WasmEdgeResultCode::FAIL as u8),
+			}
+		}
+	}
+
+	fn send_async_fileparts_request(self) -> impl Fn(Vec<WasmValue>) -> Result<Vec<WasmValue>, u8> {
+		let _self = self.clone();
+		move |inputs: Vec<WasmValue>| -> Result<Vec<WasmValue>, u8> {
+			let mut bg = _self.bg.lock().unwrap();
+			let mut mbg = bg.borrow_mut().clone();
+			drop(bg);
+			let memory = mbg
+				.vm()
+				.active_module()
+				.unwrap()
+				.get_memory("memory")
+				.unwrap();
+
+			let (url, method, headers, body, fileparts) =
+				match Wasm::parse_fileparts_params(&memory, inputs) {
+					Ok(p) => p,
+					Err(e) => return Err(e),
+				};
+
+			let _ = Wasm::do_fileparts_request(url, method, headers, body, fileparts);
 
 			Ok(vec![])
 		}
@@ -288,6 +388,42 @@ impl Wasm {
 		}
 	}
 
+	pub fn execute_fileparts(
+		&self,
+		func_name: &str,
+		headers: String,
+		queries: String,
+		body: Vec<u8>,
+		fileparts: Vec<u8>,
+	) -> Result<(u16, String, Vec<u8>), String> {
+		let params = vec![
+			Param::String(headers),
+			Param::String(queries),
+			Param::VecU8(body),
+			Param::VecU8(fileparts),
+		];
+		let mut bg = self.bg.lock().unwrap();
+		let mut mbg = bg.borrow_mut().clone();
+		drop(bg);
+		match mbg.run_wasm(func_name, params) {
+			Ok(rv) => {
+				if let Ok(mut v) = rv {
+					if v.len() == 3 {
+						if let Ok(ret_body) = v.pop().unwrap().downcast::<Vec<u8>>() {
+							if let Ok(ret_headers) = v.pop().unwrap().downcast::<String>() {
+								if let Ok(ret_status) = v.pop().unwrap().downcast::<u16>() {
+									return Ok((*ret_status, *ret_headers, *ret_body));
+								}
+							}
+						}
+					}
+				}
+				Err(String::from("Invalid return values"))
+			}
+			Err(e) => Err(format!("{:?}", e)),
+		}
+	}
+
 	fn do_request(
 		url: String,
 		method: Method,
@@ -300,6 +436,59 @@ impl Wasm {
 				.build()
 				.unwrap();
 			match c.request(method, url).headers(headers).body(body).send() {
+				Ok(r) => {
+					let status = r.status().as_u16();
+					match r.bytes() {
+						Ok(b) => Ok((status, b.as_ref().to_vec())),
+						Err(e) => Err(format!("{:?}", e)),
+					}
+				}
+				Err(e) => Err(format!("{:?}", e)),
+			}
+		})
+	}
+
+	fn do_fileparts_request(
+		url: String,
+		method: Method,
+		headers: HeaderMap,
+		body: Vec<u8>,
+		fileparts: Vec<u8>,
+	) -> Result<(u16, Vec<u8>), String> {
+		tokio::task::block_in_place(move || {
+			let c = ClientBuilder::new()
+				.timeout(Duration::from_secs(TIMEOUT))
+				.build()
+				.unwrap();
+
+			let mut request = multipart::Form::new();
+			match serde_json::from_slice(&body) {
+				Ok(Value::Object(b)) => {
+					request = b.into_iter().fold(request, |accum, (k, v)| {
+						if v.is_string() {
+							return accum.text(k, v.as_str().unwrap().to_string());
+						}
+						accum
+					});
+				}
+				_ => (),
+			}
+
+			let fps: FileParts = fileparts.into();
+			for f in fps.inner.into_iter() {
+				if let Ok(part) = multipart::Part::bytes(f.bytes)
+					.file_name(f.file_name)
+					.mime_str(&f.mime_str)
+				{
+					request = request.part("file", part);
+				}
+			}
+			match c
+				.request(method, url)
+				.headers(headers)
+				.multipart(request)
+				.send()
+			{
 				Ok(r) => {
 					let status = r.status().as_u16();
 					match r.bytes() {

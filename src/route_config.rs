@@ -1,16 +1,24 @@
+use serde::{Deserialize, Serialize};
 use std::fs;
-use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Method {
-	#[serde(rename = "GET")]
-	Get,
-	#[serde(rename = "POST")]
-	Post,
-	#[serde(rename = "PUT")]
-	PUT,
 	#[serde(rename = "DELETE")]
-	Delete
+	Delete = 2,
+	#[serde(rename = "GET")]
+	Get = 4,
+	#[serde(rename = "HEAD")]
+	Head = 8,
+	#[serde(rename = "OPTIONS")]
+	Options = 16,
+	#[serde(rename = "PATCH")]
+	Patch = 32,
+	#[serde(rename = "POST")]
+	Post = 64,
+	#[serde(rename = "PUT")]
+	Put = 128,
+	#[serde(rename = "TRACE")]
+	Trace = 256,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -20,7 +28,9 @@ pub enum ContentType {
 	#[serde(rename = "application/json")]
 	Json,
 	#[serde(rename = "application/x-www-form-urlencoded")]
-	FormUrlencoded, 
+	FormUrlencoded,
+	#[serde(rename = "multipart/form-data")]
+	Multipart,
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +48,11 @@ pub struct Config {
 
 impl Config {
 	pub fn new(filepath: String) -> Config {
-		toml::from_str(String::from_utf8(fs::read(filepath).unwrap()).unwrap().as_str()).unwrap()
+		toml::from_str(
+			String::from_utf8(fs::read(filepath).unwrap())
+				.unwrap()
+				.as_str(),
+		)
+		.unwrap()
 	}
 }

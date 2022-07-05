@@ -1498,8 +1498,6 @@ dependencies = [
 [[package]]
 name = "wasmedge-bindgen-host"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5bc9e702e08203063e6c09105a535e4d5e888ce11d85d125471b16d96838258"
 dependencies = [
  "num-derive",
  "num-traits",
