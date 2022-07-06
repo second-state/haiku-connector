@@ -1530,11 +1530,11 @@ dependencies = [
  "wasmedge-bindgen-host",
  "wasmedge-sys",
  "wasmedge-types",
- "wasmhaiku-host",
+ "wasmhaiku-glue",
 ]
 
 [[package]]
-name = "wasmhaiku-host"
+name = "wasmhaiku-glue"
 version = "0.1.0"
 dependencies = [
  "serde_json",

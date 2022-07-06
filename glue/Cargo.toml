@@ -1,5 +1,5 @@
 [package]
-name = "wasmhaiku-host"
+name = "wasmhaiku-glue"
 version = "0.1.0"
 edition = "2021"
 

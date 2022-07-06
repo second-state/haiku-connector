@@ -17,7 +17,7 @@ use wasmedge_bindgen_host::{Bindgen, Param};
 use wasmedge_sys::*;
 use wasmedge_types::ValType;
 
-use wasmhaiku_host::{fileparts::FileParts, RequestMethod};
+use wasmhaiku_glue::{fileparts::FileParts, RequestMethod};
 
 const TIMEOUT: u64 = 120;
 

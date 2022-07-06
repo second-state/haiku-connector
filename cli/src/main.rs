@@ -17,7 +17,7 @@ use axum::{
 };
 use lazy_static::lazy_static;
 
-use wasmhaiku_host::fileparts::{FilePart, FileParts};
+use wasmhaiku_glue::fileparts::{FilePart, FileParts};
 
 use initial::Initial;
 

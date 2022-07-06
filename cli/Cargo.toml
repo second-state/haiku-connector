@@ -19,4 +19,4 @@ wasmedge-bindgen-host = "0.4"
 toml = "0.5"
 clap = { version = "3.2.5", features = ["derive"] }
 
-wasmhaiku-host = { path = "../host" }
+wasmhaiku-glue = { path = "../glue" }
