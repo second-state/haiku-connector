@@ -60,7 +60,10 @@ fn settle_resp(
 	));
 }
 
-fn handler(func_name: String, async_func_name: Option<String>) -> impl Handler<(HeaderMap, Query<HashMap<String, String>>, Bytes)> {
+fn handler(
+	func_name: String,
+	async_func_name: Option<String>,
+) -> impl Handler<(HeaderMap, Query<HashMap<String, String>>, Bytes)> {
 	return |headers: HeaderMap,
 	        Query(queries): Query<HashMap<String, String>>,
 	        bytes: Bytes|
@@ -74,16 +77,21 @@ fn handler(func_name: String, async_func_name: Option<String>) -> impl Handler<(
 			let body = bytes.to_vec();
 			let headers = format!("{:?}", headers);
 			let queries = serde_json::to_string(&queries).unwrap();
-			match INIT
-				.wasm
-				.execute(func_name.as_str(), headers.as_str(), queries.as_str(), &body)
-			{
+			match INIT.wasm.execute(
+				func_name.as_str(),
+				headers.as_str(),
+				queries.as_str(),
+				&body,
+			) {
 				Ok((ret_status, ret_headers, ret_body)) => {
 					if async_func_name.is_some() && ret_status == 100 {
 						tokio::spawn(async move {
-							let _ = INIT
-								.wasm
-								.execute(async_func_name.unwrap().as_str(), headers.as_str(), queries.as_str(), &body);
+							let _ = INIT.wasm.execute(
+								async_func_name.unwrap().as_str(),
+								headers.as_str(),
+								queries.as_str(),
+								&body,
+							);
 						});
 						// return 200 if the async func is called
 						settle_resp(200, ret_headers, ret_body)
@@ -176,16 +184,23 @@ fn multipart_handler(
 			let headers = format!("{:?}", headers);
 			let queries = serde_json::to_string(&queries).unwrap();
 
-			match INIT
-				.wasm
-				.execute_fileparts(func_name.as_str(), headers.as_str(), queries.as_str(), &body, &fileparts)
-			{
+			match INIT.wasm.execute_fileparts(
+				func_name.as_str(),
+				headers.as_str(),
+				queries.as_str(),
+				&body,
+				&fileparts,
+			) {
 				Ok((ret_status, ret_headers, ret_body)) => {
 					if async_func_name.is_some() && ret_status == 100 {
 						tokio::spawn(async move {
-							let _ = INIT
-								.wasm
-								.execute_fileparts(async_func_name.unwrap().as_str(), headers.as_str(), queries.as_str(), &body, &fileparts);
+							let _ = INIT.wasm.execute_fileparts(
+								async_func_name.unwrap().as_str(),
+								headers.as_str(),
+								queries.as_str(),
+								&body,
+								&fileparts,
+							);
 						});
 						// return 200 if the async func is called
 						settle_resp(200, ret_headers, ret_body)
