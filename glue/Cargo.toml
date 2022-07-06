@@ -2,6 +2,9 @@
 name = "wasmhaiku-glue"
 version = "0.1.0"
 edition = "2021"
+description = "Glue for call functions between WasmEdeg host and WebAssembly"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/second-state/haiku-connector/glue"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
