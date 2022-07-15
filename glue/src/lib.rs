@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, mem};
+use std::{collections::HashMap, fmt};
 
 pub mod fileparts;
 
@@ -85,13 +85,6 @@ fn parse_params(
 		let url_pointer = url.as_mut_ptr() as i32;
 		let url_len = url.len() as i32;
 
-		// let mut headers = match serde_json::to_vec(headers) {
-		// 	Ok(s) => s,
-		// 	Err(_) => {
-		// 		return Err(String::from("Failed to parse headers"));
-		// 	}
-		// };
-
 		let headers_pointer = headers.as_mut_ptr() as i32;
 		let headers_len = headers.len() as i32;
 
@@ -123,8 +116,6 @@ fn parse_fileparts_params(
 	let (fileparts_pointer, fileparts_len) = match fileparts.len() {
 		0 => (0, 0),
 		_ => {
-			// Forget the fileparts
-			let mut fileparts = mem::ManuallyDrop::new(fileparts);
 			(fileparts.as_mut_ptr() as i32, fileparts.len() as i32)
 		}
 	};

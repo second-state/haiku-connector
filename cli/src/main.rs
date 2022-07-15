@@ -216,7 +216,7 @@ fn multipart_handler(
 	};
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
 	INIT.wasm.init();
 
