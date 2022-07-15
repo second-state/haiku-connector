@@ -247,9 +247,8 @@ impl Wasm {
 	}
 
 	fn send_request(self) -> impl Fn(Vec<WasmValue>) -> Result<Vec<WasmValue>, u8> {
-		let _self = self.clone();
 		move |inputs: Vec<WasmValue>| -> Result<Vec<WasmValue>, u8> {
-			let mut bg = _self.bg.lock().unwrap();
+			let mut bg = self.bg.lock().unwrap();
 			let mut mbg = bg.borrow_mut().clone();
 			drop(bg);
 			let mut memory = mbg
@@ -276,9 +275,8 @@ impl Wasm {
 	}
 
 	fn send_async_request(self) -> impl Fn(Vec<WasmValue>) -> Result<Vec<WasmValue>, u8> {
-		let _self = self.clone();
 		move |inputs: Vec<WasmValue>| -> Result<Vec<WasmValue>, u8> {
-			let mut bg = _self.bg.lock().unwrap();
+			let mut bg = self.bg.lock().unwrap();
 			let mut mbg = bg.borrow_mut().clone();
 			drop(bg);
 			let memory = mbg
@@ -302,9 +300,8 @@ impl Wasm {
 	}
 
 	fn send_fileparts_request(self) -> impl Fn(Vec<WasmValue>) -> Result<Vec<WasmValue>, u8> {
-		let _self = self.clone();
 		move |inputs: Vec<WasmValue>| -> Result<Vec<WasmValue>, u8> {
-			let mut bg = _self.bg.lock().unwrap();
+			let mut bg = self.bg.lock().unwrap();
 			let mut mbg = bg.borrow_mut().clone();
 			drop(bg);
 			let mut memory = mbg
@@ -332,9 +329,8 @@ impl Wasm {
 	}
 
 	fn send_async_fileparts_request(self) -> impl Fn(Vec<WasmValue>) -> Result<Vec<WasmValue>, u8> {
-		let _self = self.clone();
 		move |inputs: Vec<WasmValue>| -> Result<Vec<WasmValue>, u8> {
-			let mut bg = _self.bg.lock().unwrap();
+			let mut bg = self.bg.lock().unwrap();
 			let mut mbg = bg.borrow_mut().clone();
 			drop(bg);
 			let memory = mbg
